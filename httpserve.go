@@ -134,7 +134,6 @@ func (s Server) binData(w http.ResponseWriter, r *http.Request) {
 	}
 	data, ok := assets.Data[urlPath]
 	if !ok {
-
 		writeStatus(w, http.StatusNotFound, "Not found")
 		return
 	}
