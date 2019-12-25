@@ -2,7 +2,6 @@ package httpserve
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -12,6 +11,11 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/gorilla/websocket"
 )
+
+type watcherMsg struct {
+	Op    string          `json:"op"`
+	Value json.RawMessage `json:"value"`
+}
 
 // Watcher websocket handler
 func (s Server) watcher(w http.ResponseWriter, r *http.Request) {
@@ -29,6 +33,7 @@ func (s Server) watcher(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+	defer watcher.Close()
 	update := debounce(time.Millisecond*100, func() {
 		err := c.WriteJSON("reload")
 		if err != nil {
@@ -45,45 +50,54 @@ func (s Server) watcher(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	for {
-		err := func() error {
-			mt, data, err := c.ReadMessage()
-			if err != nil {
-				return err
-			}
-			if mt != websocket.TextMessage {
-				return nil
-			}
+		mt, data, err := c.ReadMessage()
+		if err != nil {
+			log.Println("Read msg error:", err)
+			break
+		}
+		if mt != websocket.TextMessage {
+			continue
+		}
 
-			msg := []string{}
-			err = json.Unmarshal(data, &msg)
-			if err != nil {
-				return err
-			}
-			/////////////
-			// message handling
-			/////////
-			for _, toWatch := range msg {
+		msg := watcherMsg{}
+		if err = json.Unmarshal(data, &msg); err != nil {
+			log.Println("Unmarshal error:", err)
+			break
+		}
+
+		switch msg.Op {
+		case "watch":
+			var val []string
+			json.Unmarshal(msg.Value, &val)
+			for _, toWatch := range val {
 				u, err := url.Parse(toWatch)
 				if err != nil {
-					return err
+					log.Println("Url parse error:", err)
+					return
 				}
 				absFile, err := filepath.Abs(u.Path[1:])
 				if err != nil {
-					return err
+					log.Println("Filepath abs error:", err)
+					return
 				}
 				err = watcher.Add(absFile) // remove root '/' prefix
 				if err != nil {
-					return fmt.Errorf("Error watching '%s (%s)' -- %s", toWatch, u.Path, err.Error())
+					log.Printf("Error watching '%s (%s)' -- %s", toWatch, u.Path, err.Error())
+					return
 				}
 			}
-			return nil
-		}()
-		if err != nil {
-			log.Println("WATCH Error:", err)
-			watcher.Close()
-			return
+		case "error":
+			var val []string
+			json.Unmarshal(msg.Value, &val)
+			log.Println("client err:", val)
+		case "log":
+			var val interface{}
+			if err := json.Unmarshal(msg.Value, &val); err != nil {
+				log.Print("log error unmarshalling:", err)
+				continue
+			}
+			log.Println("console.log:", val)
 		}
-
 	}
 }
 
