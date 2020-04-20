@@ -13,8 +13,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	blackfriday "github.com/russross/blackfriday/v2"
 	"golang.org/x/exp/rand"
-	blackfriday "gopkg.in/russross/blackfriday.v2"
 )
 
 func (s *Server) renderMarkDown(p string, w http.ResponseWriter, r *http.Request) error {
