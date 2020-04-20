@@ -70,8 +70,11 @@ func (s *Server) renderWasm(p string, w http.ResponseWriter, r *http.Request) er
 		return err
 	}
 	tf.Close()
-
 	defer os.Remove(tf.Name())
+
+	versionCmd := exec.Command("go", "version")
+	versionCmd.Stdout = log.Writer()
+	versionCmd.Run()
 
 	// BUILDCOMMAND
 	errBuf := new(bytes.Buffer)
