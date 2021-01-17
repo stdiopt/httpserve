@@ -1,6 +1,6 @@
 //go:generate go run ./cmd/genversion -out version.go -package httpserve
-//go:generate go run github.com/gohxs/folder2go -nobackup assets-src assets
 
+// Package httpserve serves files, markdown, wasm
 package httpserve
 
 import (
@@ -55,7 +55,6 @@ func New(opt Options) *Server {
 	mux.HandleFunc("/", s.files)
 
 	return s
-
 }
 
 // The default route
