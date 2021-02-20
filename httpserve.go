@@ -24,6 +24,8 @@ type Server struct {
 	http.Handler
 	flagMdCSS string
 	tmpl      *template.Template
+
+	wasm *WasmHandler
 	// Options goes here
 }
 
@@ -59,6 +61,8 @@ func New(opt Options) (*Server, error) {
 		Handler:   mux,
 		flagMdCSS: opt.FlagMdCSS,
 		tmpl:      tmpl,
+
+		wasm: &WasmHandler{tmpl},
 	}
 
 	mux.HandleFunc("/.httpServe/_reload", s.watcher)
@@ -103,7 +107,7 @@ func (s Server) renderer(w http.ResponseWriter, r *http.Request) {
 		// Check for main.go file
 		mainGo := filepath.Join(path, "main.go")
 		if _, err := os.Stat(mainGo); err == nil {
-			if err := s.renderWasm(path, w, r); err != nil {
+			if err := s.wasm.render(path, w, r); err != nil {
 				writeStatus(w, http.StatusInternalServerError, err)
 			}
 			break

@@ -39,48 +39,82 @@
 	</script>
 </template>
 
+<script src="/.httpServe/js/watcher.js"></script>
+<script src="/.httpServe/term/xterm.min.js"></script>
+<script src="/.httpServe/term/xterm-addon-fit.min.js"></script>
+<link rel="stylesheet" href="/.httpServe/term/xterm.css" />
+
 <script>
 const toggler = (...args) => (active) => args.forEach(v => {v.style.display=v==active?'':'none';v.focus()})
 window.onload = function(evt) {
-	const $loader	= document.querySelector("loader")
+
+	const $loader	= document.querySelector("app-loader")
 	const $iframe	= document.querySelector("iframe")
-	const $counter	= document.querySelector("counter")
-	const $progress	= document.querySelector("progressvalue")
-	const $output	= document.querySelector("output")
+	const $progress	= document.querySelector("app-progress")
+	const $counter	= document.querySelector("app-counter")
+	const $progressval	= document.querySelector("app-progressvalue")
+	const $output	= document.querySelector("app-output")
 	const toggle = toggler($loader,$iframe)
+	
+	const term = new Terminal()
+	const fitAddon = new FitAddon.FitAddon()
+	term.setOption('theme',{background:'#333',foreground:'#aaa'})
+	term.open($output)
+	term.loadAddon(fitAddon)
+	fitAddon.fit()
+
+	// oh well
+	setInterval(()=> { fitAddon.fit() },100)
+	$counter.innerHTML = "Receiving&nbsp;<i>{{.pkg}}</i>"
+
 	window.addEventListener("keyup", (evt) => evt.key == "Escape" && toggle($iframe))
 	window.addEventListener('message', (evt) => {
 		switch (evt.data.type) {
 			case "progress":
-				if (evt.data.msg == "done"){toggle($iframe);break}
+				if (evt.data.msg == "done"){
+					//$progress.remove()
+					toggle($iframe);
+					break
+				}
 				const percent = (evt.data.msg * 100).toFixed(2) + '%'
-				$progress.style.width = percent
+				$progressval.style.width = percent
 				$counter.innerHTML = "Receiving&nbsp;<i>{{.pkg}}</i>&nbsp;<b>"+percent+"</b>"
 				break
 			case "done": case "error": case "switch": 
-				toggle($loader);break
+				toggle($loader);
+				break
 			default:
-				$output.innerHTML += evt.data.msg+"\n"
+				term.write(evt.data.msg.replaceAll(/\r?\n/g,"\r\n")+"\r\n")
+				//$output.innerHTML += evt.data.msg+"\n"
 		}
 	})
 	$iframe.contentDocument.write( document.querySelector("#wasm_script").innerHTML)
 	//const wasmFile	= (new URLSearchParams(window.location.search)).get("t") || "main.wasm"
-	const wasmFile	= window.location + "?f=wasm"
-	alert(wasmFile)
+	const wasmFile	= window.location.pathname + "?f=wasm"
 	$iframe.contentWindow.postMessage(wasmFile)
 }
 </script>
 
 <style>
-body,body *{box-sizing:border-box;display:flex;border:none;}
-body{position:relative;margin:0;padding:0;height:100vh;flex-flow:column;align-items:stretch;}body>*{flex:1;}
-loader{position:relative;padding:20px;flex-flow:column;justify-content:center;align-items:center;}
-progressvalue{background:#00add8;box-shadow:0px 0px 5px 0px cyan;width:0%;}
-progressbar{margin:10px;height:3px;width:200px;justify-content:center;background:rgba(0,200,255,0.1);}
-output{flex-flow:column;white-space:pre-wrap;font-family:monospace;max-width:80em;overflow-wrap:anywhere;color:#aa4400;}
+body,body *{box-sizing:border-box;border:none;}
+body{overflow:hidden;display:flex;position:relative;margin:0;padding:0;height:100vh;flex-flow:column;align-items:stretch;}body>*{flex:1;}
+app-loader{display:flex;background:#333;color:#aaa;position:relative;flex-flow:column;justify-content:start;align-items:center;}
+app-progress{display:flex;flex-flow:column;padding-top:20px;z-index:1000;align-items:center}
+app-progressvalue{display:flex;background:#00add8;box-shadow:0px 0px 5px 0px cyan;width:0%;}
+app-progressbar{display:flex;margin:10px;height:3px;width:200px;justify-content:center;background:rgba(0,200,255,0.1);}
+app-output{flex:1;width:100%;height:100%;overflow:hidden}
 </style>
 </head>
+
 <body>
-<loader><counter></counter><progressbar><progressvalue></progressvalue></progressbar><output></output></loader>
+<app-loader>
+	<app-progress>
+		<app-counter></app-counter>
+		<app-progressbar>
+			<app-progressvalue></app-progressvalue>
+		</app-progressbar>
+	</app-progress>
+	<app-output></app-output>
+</app-loader>
 <iframe style="display:none"/>
 </body>
