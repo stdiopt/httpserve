@@ -6,12 +6,10 @@ package httpserve
 import (
 	"fmt"
 	"html/template"
-	"log"
-	"mime"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/stdiopt/httpserve/assets"
 )
@@ -26,21 +24,36 @@ type Server struct {
 	http.Handler
 	flagMdCSS string
 	tmpl      *template.Template
+
+	wasm *WasmHandler
 	// Options goes here
 }
 
 // New register routes
-func New(opt Options) *Server {
+func New(opt Options) (*Server, error) {
 	mux := http.NewServeMux()
 
 	tmpl := template.New("")
-	for k := range assets.Data {
-		if !strings.HasPrefix(k, "tmpl/") {
-			continue
-		}
-		_, err := tmpl.New(k).Parse(string(assets.Data[k]))
+
+	srcFS, err := fs.Sub(assets.FS, "src")
+	if err != nil {
+		return nil, err
+	}
+
+	tmplDir, err := fs.ReadDir(srcFS, "tmpl")
+	if err != nil {
+		return nil, err
+	}
+	for _, k := range tmplDir {
+		name := k.Name()
+
+		data, err := fs.ReadFile(srcFS, filepath.Join("tmpl", name))
 		if err != nil {
-			log.Fatal("Internal error, loading templates")
+			return nil, err
+		}
+
+		if _, err := tmpl.New("tmpl/" + name).Parse(string(data)); err != nil {
+			return nil, err
 		}
 	}
 
@@ -48,17 +61,19 @@ func New(opt Options) *Server {
 		Handler:   mux,
 		flagMdCSS: opt.FlagMdCSS,
 		tmpl:      tmpl,
+
+		wasm: &WasmHandler{tmpl},
 	}
 
 	mux.HandleFunc("/.httpServe/_reload", s.watcher)
-	mux.Handle("/.httpServe/", http.StripPrefix("/.httpServe", http.HandlerFunc(s.binData)))
-	mux.HandleFunc("/", s.files)
+	mux.Handle("/.httpServe/", http.StripPrefix("/.httpServe", http.FileServer(http.FS(srcFS))))
+	mux.HandleFunc("/", s.renderer)
 
-	return s
+	return s, nil
 }
 
 // The default route
-func (s Server) files(w http.ResponseWriter, r *http.Request) {
+func (s Server) renderer(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path[1:]
 
 	if path == "" {
@@ -67,9 +82,8 @@ func (s Server) files(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	if strings.Contains(path, "..") { // ServeFile will normalize path
-		http.ServeFile(w, r, path)
-	}
+	path = filepath.Clean(path)
+	ext := filepath.Ext(path)
 
 	fstat, err := os.Stat(path)
 	if err != nil {
@@ -78,66 +92,42 @@ func (s Server) files(w http.ResponseWriter, r *http.Request) {
 	}
 	raw := r.URL.Query().Get("raw")
 
-	// Rules to select file renderers
-
-	// It is a dir
-	// Handle dir in another method
-	if fstat.IsDir() {
-		if raw != "1" {
-			// Check for index file
-			indexFile := filepath.Join(path, "index.html")
-			if _, err := os.Stat(indexFile); err == nil {
-				http.ServeFile(w, r, indexFile)
-				return
+	switch {
+	case fstat.IsDir() && raw == "1":
+		if err := s.renderFolder(path, w, r); err != nil {
+			writeStatus(w, http.StatusInternalServerError, err)
+		}
+	case fstat.IsDir():
+		// Check for index file
+		indexFile := filepath.Join(path, "index.html")
+		if _, err := os.Stat(indexFile); err == nil {
+			http.ServeFile(w, r, indexFile)
+			break
+		}
+		// Check for main.go file
+		mainGo := filepath.Join(path, "main.go")
+		if _, err := os.Stat(mainGo); err == nil {
+			if err := s.wasm.render(path, w, r); err != nil {
+				writeStatus(w, http.StatusInternalServerError, err)
 			}
-			// Check for main.go file
-			mainGo := filepath.Join(path, "main.go")
-			if _, err := os.Stat(mainGo); err == nil {
-				if err := s.renderWasm(path, w, r); err != nil {
-					writeStatus(w, http.StatusInternalServerError, err)
-				}
-				return
-			}
+			break
 		}
 		if err := s.renderFolder(path, w, r); err != nil {
 			writeStatus(w, http.StatusInternalServerError, err)
 		}
-		return
-	}
-
-	if raw == "1" {
+	case raw == "1":
 		http.ServeFile(w, r, path)
-	}
-
-	if filepath.Ext(path) == ".md" {
+	case ext == ".md":
 		if err := s.renderMarkDown(path, w, r); err != nil {
 			writeStatus(w, http.StatusInternalServerError, err)
 		}
-		return
-	}
-	if filepath.Ext(path) == ".dot" && r.URL.Query().Get("f") == "png" {
+	case ext == ".dot" && r.URL.Query().Get("f") == "png":
 		if err := s.renderDotPng(path, w, r); err != nil {
 			writeStatus(w, http.StatusInternalServerError, err)
 		}
-		return
+	default:
+		http.ServeFile(w, r, path)
 	}
-	// default
-	http.ServeFile(w, r, path)
-}
-
-// binData handler
-func (s Server) binData(w http.ResponseWriter, r *http.Request) {
-	urlPath := strings.TrimPrefix(r.URL.String(), "/")
-	if urlPath == "" {
-		urlPath = "index.html"
-	}
-	data, ok := assets.Data[urlPath]
-	if !ok {
-		writeStatus(w, http.StatusNotFound, "Not found")
-		return
-	}
-	w.Header().Set("Content-type", mime.TypeByExtension(filepath.Ext(urlPath)))
-	w.Write(data)
 }
 
 func writeStatus(w http.ResponseWriter, code int, extras ...interface{}) {

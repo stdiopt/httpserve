@@ -1,20 +1,14 @@
 package httpserve
 
 import (
-	"bytes"
-	"encoding/base64"
-	"fmt"
-	"go/build"
 	"html/template"
 	"io/ioutil"
-	"log"
+	"math/rand"
 	"net/http"
-	"os"
 	"os/exec"
 	"path/filepath"
 
 	blackfriday "github.com/russross/blackfriday/v2"
-	"golang.org/x/exp/rand"
 )
 
 func (s *Server) renderMarkDown(p string, w http.ResponseWriter, r *http.Request) error {
@@ -60,51 +54,4 @@ func (s *Server) renderDotPng(p string, w http.ResponseWriter, r *http.Request) 
 	cmd := exec.Command("dot", "-Tpng", absPath)
 	cmd.Stdout = w
 	return cmd.Run()
-}
-
-func (s *Server) renderWasm(p string, w http.ResponseWriter, r *http.Request) error {
-	log.Printf("building %v...", p)
-
-	tf, err := ioutil.TempFile(os.TempDir(), "http-serve.")
-	if err != nil {
-		return err
-	}
-	tf.Close()
-	defer os.Remove(tf.Name())
-
-	versionCmd := exec.Command("go", "version")
-	versionCmd.Stdout = log.Writer()
-	versionCmd.Run()
-
-	// BUILDCOMMAND
-	errBuf := new(bytes.Buffer)
-	cmd := exec.Command("go", "build", "-o", tf.Name(), "./"+p)
-	cmd.Env = append(os.Environ(), "GOOS=js", "GOARCH=wasm")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = errBuf
-	if err := cmd.Run(); err != nil {
-		fmt.Fprint(w, errBuf.String())
-		return err
-	}
-
-	// wasm code read
-	code, err := ioutil.ReadFile(tf.Name())
-	if err != nil {
-		log.Println("err:", err)
-		return err
-	}
-
-	goroot := build.Default.GOROOT
-	wasmExecName := filepath.Join(goroot, "misc/wasm/wasm_exec.js")
-
-	// Read wasm_exec from system dist
-	wasmExec, err := ioutil.ReadFile(wasmExecName)
-	if err != nil {
-		return err
-	}
-	w.Header().Set("Content-type", "text/html")
-	return s.tmpl.ExecuteTemplate(w, "tmpl/wasm.tmpl", map[string]interface{}{
-		"wasmexec": template.JS(wasmExec),
-		"wasmcode": base64.StdEncoding.EncodeToString(code),
-	})
 }
