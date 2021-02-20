@@ -23,13 +23,28 @@
 		//////////////////////
 		// Process viz
 		////////////////
-		elList = document.querySelectorAll("code.language-dotg,code.dotg")
 		let viz = new Viz()
+
+		elList = document.querySelectorAll("code.language-dotg,code.dotg")
 		for (var i = 0; i < elList.length; i++) {
 			((el) => {
 				var text = el.innerText
 				el.innerHTML = "<i>rendering dot...</i>" // why not showing?
 				viz.renderSVGElement(text)
+					.then(function(element) {
+						el.parentNode.parentNode.replaceChild(element, el.parentNode)
+					}).catch( error => {
+						viz = new Viz() // Some caveat on viz
+					})
+			})(elList[i])
+		}
+
+		elList = document.querySelectorAll("code.language-dotg_png,code.dotg_png")
+		for (var i = 0; i < elList.length; i++) {
+			((el) => {
+				var text = el.innerText
+				el.innerHTML = "<i>rendering dot...</i>" // why not showing?
+				viz.renderImageElement(text, {mimeType:'image/png'})
 					.then(function(element) {
 						el.parentNode.parentNode.replaceChild(element, el.parentNode)
 					}).catch( error => {

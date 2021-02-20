@@ -15,7 +15,7 @@ import (
 
 // Watcher websocket handler
 func (s Server) watcher(w http.ResponseWriter, r *http.Request) {
-	var upgrader = websocket.Upgrader{}
+	upgrader := websocket.Upgrader{}
 
 	log.Println("Starting watcher for", r.RemoteAddr)
 	// Start watcher
@@ -73,7 +73,7 @@ func (s Server) watcher(w http.ResponseWriter, r *http.Request) {
 				}
 				err = watcher.Add(absFile) // remove root '/' prefix
 				if err != nil {
-					return fmt.Errorf("Error watching '%s (%s)' -- %s", toWatch, u.Path, err.Error())
+					return fmt.Errorf("error watching '%s (%s)' -- %s", toWatch, u.Path, err.Error())
 				}
 			}
 			return nil

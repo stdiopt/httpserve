@@ -39,9 +39,13 @@ func main() {
 		handler = httputil.NewSingleHostReverseProxy(u)
 	} else {
 		logger = prettylog.New("files")
-		handler = httpserve.New(httpserve.Options{
+		h, err := httpserve.New(httpserve.Options{
 			FlagMdCSS: flagMdCSS,
 		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		handler = h
 	}
 	mw := httpserve.Middlewares{httpserve.Logger(logger)}
 
@@ -63,6 +67,9 @@ func main() {
 		addrW := bytes.NewBuffer(nil)
 		fmt.Fprintf(addrW, "    http://localhost:%d\n", port)
 		addrs, err := net.InterfaceAddrs()
+		if err != nil {
+			log.Fatal("err:", err)
+		}
 		for _, a := range addrs {
 			astr := a.String()
 			if strings.HasPrefix(astr, "192.168") ||
