@@ -66,6 +66,7 @@ func New(opt Options) (*Server, error) {
 	}
 
 	mux.HandleFunc("/.httpServe/_reload", s.watcher)
+	mux.HandleFunc("/.httpServe/d2", s.renderD2)
 	mux.Handle("/.httpServe/", http.StripPrefix("/.httpServe", http.FileServer(http.FS(srcFS))))
 	mux.HandleFunc("/", s.renderer)
 
@@ -118,11 +119,15 @@ func (s Server) renderer(w http.ResponseWriter, r *http.Request) {
 	case raw == "1":
 		http.ServeFile(w, r, path)
 	case ext == ".md":
-		if err := s.renderMarkDown(path, w, r); err != nil {
+		if err := s.renderFileMarkDown(path, w, r); err != nil {
 			writeStatus(w, http.StatusInternalServerError, err)
 		}
 	case ext == ".dot" && r.URL.Query().Get("f") == "png":
-		if err := s.renderDotPng(path, w, r); err != nil {
+		if err := s.renderFileDotPng(path, w, r); err != nil {
+			writeStatus(w, http.StatusInternalServerError, err)
+		}
+	case ext == ".d2" && r.URL.Query().Get("f") == "png":
+		if err := s.renderFileD2(path, w, r); err != nil {
 			writeStatus(w, http.StatusInternalServerError, err)
 		}
 	default:

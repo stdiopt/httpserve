@@ -25,21 +25,24 @@
 		////////////////
 		let viz = new Viz()
 
-		elList = document.querySelectorAll("code.language-dotg,code.dotg")
+		elList = document.querySelectorAll("code.language-dot,code.dot")
 		for (var i = 0; i < elList.length; i++) {
 			((el) => {
 				var text = el.innerText
 				el.innerHTML = "<i>rendering dot...</i>" // why not showing?
 				viz.renderSVGElement(text)
 					.then(function(element) {
-						el.parentNode.parentNode.replaceChild(element, el.parentNode)
+						var div = document.createElement('div')
+						div.appendChild(element)
+
+						el.parentNode.parentNode.replaceChild(div, el.parentNode)
 					}).catch( error => {
 						viz = new Viz() // Some caveat on viz
 					})
 			})(elList[i])
 		}
 
-		elList = document.querySelectorAll("code.language-dotg_png,code.dotg_png")
+		elList = document.querySelectorAll("code.language-dot_png,code.dot_png")
 		for (var i = 0; i < elList.length; i++) {
 			((el) => {
 				var text = el.innerText
@@ -53,6 +56,27 @@
 			})(elList[i])
 		}
 		hljs.initHighlightingOnLoad();
+
+		// Request D2 from the server
+		elList = document.querySelectorAll("code.language-d2,code.d2")
+		for (var i = 0; i< elList.length; i++) {
+			((el) => {
+				var text = el.innerText
+				el.innerHTML = "<i>rendering d2...</i>"
+				fetch('/.httpServe/d2', { method: 'POST', body: text })
+					.then(response => response.text())
+					.then(svg => {
+						var t = document.createElement('t')
+						t.innerHTML = svg
+						var div = document.createElement('div')
+						div.appendChild(t.firstElementChild.firstElementChild)
+						el.parentNode.parentNode.replaceChild(div, el.parentNode)
+					})
+					.catch( error => {
+						console.log(error)
+					})
+			})(elList[i])
+		}
 	</script>
 	<script src="/.httpServe/js/watcher.js"></script>
 	</body>

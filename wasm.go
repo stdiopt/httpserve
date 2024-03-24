@@ -7,7 +7,6 @@ import (
 	"go/build"
 	"html/template"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -22,7 +21,7 @@ type WasmHandler struct {
 }
 
 func (h *WasmHandler) tmpFile() (*os.File, func(), error) {
-	tf, err := ioutil.TempFile("", "http-serve.")
+	tf, err := os.CreateTemp("", "http-serve.")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -54,7 +53,7 @@ func (h *WasmHandler) render(pkg string, w http.ResponseWriter, r *http.Request)
 	wasmExecName := filepath.Join(goroot, "misc/wasm/wasm_exec.js")
 
 	// Read wasm_exec from system dist
-	wasmExec, err := ioutil.ReadFile(wasmExecName)
+	wasmExec, err := os.ReadFile(wasmExecName)
 	if err != nil {
 		return err
 	}
@@ -75,7 +74,7 @@ func (h *WasmHandler) renderEmbed(pkg string, w http.ResponseWriter, r *http.Req
 	}
 	defer f.Close()
 
-	code, err := ioutil.ReadAll(f)
+	code, err := io.ReadAll(f)
 	if err != nil {
 		return err
 	}
@@ -84,7 +83,7 @@ func (h *WasmHandler) renderEmbed(pkg string, w http.ResponseWriter, r *http.Req
 	wasmExecName := filepath.Join(goroot, "misc/wasm/wasm_exec.js")
 
 	// Read wasm_exec from system dist
-	wasmExec, err := ioutil.ReadFile(wasmExecName)
+	wasmExec, err := os.ReadFile(wasmExecName)
 	if err != nil {
 		return err
 	}
@@ -100,7 +99,7 @@ func (h *WasmHandler) renderEmbed(pkg string, w http.ResponseWriter, r *http.Req
 func (h *WasmHandler) build(pkg string) (*tmpFile, error) {
 	log.Printf("building %q...", pkg)
 
-	tf, err := ioutil.TempFile(os.TempDir(), "http-serve.")
+	tf, err := os.CreateTemp(os.TempDir(), "http-serve.")
 	if err != nil {
 		return nil, err
 	}

@@ -80,6 +80,9 @@ func main() {
 		}
 		log.Println(addrW.String())
 
-		http.Serve(listener, handler)
+		if err := http.Serve(listener, handler); err != nil {
+			log.Println("Err serving", err)
+		}
+
 	}
 }
