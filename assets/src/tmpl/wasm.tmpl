@@ -4,6 +4,8 @@
 <template id='wasm_script' type="text/raw">
 	<body>wasm</body>
 	<script>
+	// manual inject this to solve gioui wrong margins
+	document.body.style ="margin:0;padding:0;"
 	{{ .wasmexec }}
 	const nativeLog = console.log;
 	console.log = (...args) => {
